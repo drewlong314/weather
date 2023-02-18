@@ -4,7 +4,6 @@ use chrono::{Datelike, Duration, Local, NaiveDateTime, TimeZone};
 use serde::Deserialize;
 
 // TODO: Get Coordinates from location
-// TODO: Create a help argument
 pub struct Config {
     pub url: String,
     pub temperature_unit: String,
@@ -17,7 +16,7 @@ pub fn config(args: Args) -> Result<Config, &'static str> {
         String::from("https://api.open-meteo.com/v1/forecast?latitude=33.52&longitude=-86.80");
 
     if args.len() == 1 {
-        return Err("Not enough arguments");
+        url = String::new();
     }
 
     if args.len() < 4 {
@@ -39,15 +38,21 @@ pub fn config(args: Args) -> Result<Config, &'static str> {
                         let formatted_now = now.format("%Y-%m-%d");
                         url = url + &format!("&hourly=temperature_2m,weathercode&timezone=auto&start_date={formatted_now}&end_date={tomorrow}");
                     }
-                    _ => (),
+                    "help" => {
+                        url = String::new();
+                    }
+                    "h" => {
+                        url = String::new();
+                    }
+                    _ => url = String::new(),
                 }
             } else if i == 2 {
                 match arg.as_str() {
-                    "F" => {
+                    "-F" => {
                         url = url + "&temperature_unit=fahrenheit";
                         temperature_unit = String::from("F");
-                    },
-                    "C" => (),
+                    }
+                    "-C" => (),
                     _ => return Err("Incorrect second argument"),
                 }
             }
@@ -90,13 +95,54 @@ pub async fn run(
     }
 
     #[derive(Deserialize)]
+    struct Help {
+        message: String,
+    }
+
+    #[derive(Deserialize)]
     struct Response {
         current_weather: Option<CurrentWeather>,
         daily: Option<Daily>,
         hourly: Option<Hourly>,
+        help: Option<Help>,
     }
 
-    let resp = reqwest::get(url).await?.json::<Response>().await?;
+    let help_message = String::from(
+        "Weather - A CLI Weather App
+
+Usage:
+    weather [COMMAND] [OPTION]
+
+Commands:
+    current
+        Prints today's current forecast
+
+    today
+        Prints today's hourly forecast
+
+    week
+        Prints this week's forecast
+
+    help
+        Print this message
+
+Options:
+    -F
+        Convert's the temperature from Celcius to Farenheit",
+    );
+
+    let resp = if url.len() > 1 {
+        reqwest::get(url).await?.json::<Response>().await?
+    } else {
+        Response {
+            current_weather: None,
+            daily: None,
+            hourly: None,
+            help: Some(Help {
+                message: help_message,
+            }),
+        }
+    };
 
     if resp.current_weather.is_some() {
         let current_weather = resp.current_weather.unwrap();
@@ -159,6 +205,10 @@ pub async fn run(
                 )
             }
         }
+    }
+
+    if resp.help.is_some() {
+        println!("{}", resp.help.unwrap().message);
     }
 
     Ok(())
