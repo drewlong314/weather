@@ -106,10 +106,36 @@ pub async fn run(
     Ok(())
 }
 
-// TODO: Add the rest of the weather conditions
 fn convert_to_weather_condition(code: i32) -> String {
     match code {
+        0 => String::from("Clear Sky"),
+        1 => String::from("Mainly Clear"),
+        2 => String::from("Partly Cloudy"),
+        3 => String::from("Overcast"),
+        45 => String::from("Fog"),
+        48 => String::from("Depositing Rime Fog"),
         51 => String::from("Light Drizzle"),
+        53 => String::from("Moderate Drizzle"),
+        55 => String::from("Dense Drizzle"),
+        56 => String::from("Light Freezing Drizzle"),
+        57 => String::from("Dense Freezing Drizzle"),
+        61 => String::from("Slight Rain"),
+        63 => String::from("Moderate Rain"),
+        65 => String::from("Heavy Rain"),
+        66 => String::from("Light Freezing Rain"),
+        67 => String::from("Heavy Freezing Rain"),
+        71 => String::from("Slight Snow"),
+        73 => String::from("Moderate Snow"),
+        75 => String::from("Heavy Snow"),
+        77 => String::from("Snow Grains"),
+        80 => String::from("Slight Rain Shower"),
+        81 => String::from("Moderate Rain Shower"),
+        82 => String::from("Violent Rain Shower"),
+        85 => String::from("Slught Snow Shower"),
+        86 => String::from("Heavy Snow Shower"),
+        95 => String::from("Thunderstorm"),
+        96 => String::from("Thunderstorm with Slight Hail"),
+        99 => String::from("Thunderstorm with Heavy Hail"),
         _ => String::from("Unknown Weather Code"),
     }
 }
