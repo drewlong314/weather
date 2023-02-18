@@ -3,49 +3,63 @@ use std::{cmp::Ordering, env::Args};
 use chrono::{Datelike, Duration, Local, NaiveDateTime, TimeZone};
 use serde::Deserialize;
 
-// TODO: Add option to set location and Temperature Unit in an env
+// TODO: Get Coordinates from location
+// TODO: Create a help argument
 pub struct Config {
     pub url: String,
     pub temperature_unit: String,
 }
 
 // Maybe put this in an impl
-pub fn config(args: Args) -> Config {
+pub fn config(args: Args) -> Result<Config, &'static str> {
     let mut temperature_unit = String::from("C");
     let mut url =
         String::from("https://api.open-meteo.com/v1/forecast?latitude=33.52&longitude=-86.80");
 
-    if args.len() > 0 {
-        for arg in args {
-            match arg.as_str() {
-                "F" => {
-                    url = url + "&temperature_unit=fahrenheit";
-                    temperature_unit = String::from("F");
-                }
-                "current" => {
-                    url = url + "&current_weather=true&timezone=auto";
-                }
-                "week" => {
-                    let now = Local::now();
-                    let week = (now + Duration::days(7)).format("%Y-%m-%d");
-                    let formatted_now = now.format("%Y-%m-%d");
-                    url = url + &format!("&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto&start_date={formatted_now}&end_date={week}");
-                }
-                "today" => {
-                    let now = Local::now();
-                    let tomorrow = (now + Duration::days(1)).format("%Y-%m-%d");
-                    let formatted_now = now.format("%Y-%m-%d");
-                    url = url + &format!("&hourly=temperature_2m,weathercode&timezone=auto&start_date={formatted_now}&end_date={tomorrow}");
-                }
-                _ => (),
-            }
-        }
+    if args.len() == 1 {
+        return Err("Not enough arguments");
     }
 
-    Config {
+    if args.len() < 4 {
+        for (i, arg) in args.enumerate() {
+            if i == 1 {
+                match arg.as_str() {
+                    "current" => {
+                        url = url + "&current_weather=true&timezone=auto";
+                    }
+                    "week" => {
+                        let now = Local::now();
+                        let week = (now + Duration::days(7)).format("%Y-%m-%d");
+                        let formatted_now = now.format("%Y-%m-%d");
+                        url = url + &format!("&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto&start_date={formatted_now}&end_date={week}");
+                    }
+                    "today" => {
+                        let now = Local::now();
+                        let tomorrow = (now + Duration::days(1)).format("%Y-%m-%d");
+                        let formatted_now = now.format("%Y-%m-%d");
+                        url = url + &format!("&hourly=temperature_2m,weathercode&timezone=auto&start_date={formatted_now}&end_date={tomorrow}");
+                    }
+                    _ => (),
+                }
+            } else if i == 2 {
+                match arg.as_str() {
+                    "F" => {
+                        url = url + "&temperature_unit=fahrenheit";
+                        temperature_unit = String::from("F");
+                    },
+                    "C" => (),
+                    _ => return Err("Incorrect second argument"),
+                }
+            }
+        }
+    } else {
+        return Err("Too many arguments");
+    }
+
+    Ok(Config {
         url,
         temperature_unit,
-    }
+    })
 }
 
 pub async fn run(

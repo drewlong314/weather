@@ -1,4 +1,4 @@
-use std::env::args;
+use std::{env::args, process};
 
 use weather::config;
 #[tokio::main]
@@ -6,7 +6,10 @@ use weather::config;
 async fn main() {
     let args = args();
 
-    let config = config(args);
+    let config = config(args).unwrap_or_else(|err| {
+        eprintln!("Problem parsing arguments: {err}");
+        process::exit(1);
+    });
 
     println!("{}", config.url);
     weather::run(config).await.unwrap_or(());
