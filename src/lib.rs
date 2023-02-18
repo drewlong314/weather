@@ -1,15 +1,15 @@
-use std::env::Args;
+use std::{cmp::Ordering, env::Args};
 
-use chrono::{Datelike, Duration, Local};
+use chrono::{Datelike, Duration, Local, NaiveDateTime, TimeZone};
 use serde::Deserialize;
 
 // TODO: Add option to set location and Temperature Unit in an env
-// TODO: Show full day's forecast
 pub struct Config {
     pub url: String,
     pub temperature_unit: String,
 }
 
+// Maybe put this in an impl
 pub fn config(args: Args) -> Config {
     let mut temperature_unit = String::from("C");
     let mut url =
@@ -30,6 +30,12 @@ pub fn config(args: Args) -> Config {
                     let week = (now + Duration::days(7)).format("%Y-%m-%d");
                     let formatted_now = now.format("%Y-%m-%d");
                     url = url + &format!("&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto&start_date={formatted_now}&end_date={week}");
+                }
+                "today" => {
+                    let now = Local::now();
+                    let tomorrow = (now + Duration::days(1)).format("%Y-%m-%d");
+                    let formatted_now = now.format("%Y-%m-%d");
+                    url = url + &format!("&hourly=temperature_2m,weathercode&timezone=auto&start_date={formatted_now}&end_date={tomorrow}");
                 }
                 _ => (),
             }
@@ -62,10 +68,18 @@ pub async fn run(
         temperature_2m_min: Vec<f32>,
     }
 
+    #[derive(Deserialize, Debug)]
+    struct Hourly {
+        time: Vec<String>,
+        weathercode: Vec<i32>,
+        temperature_2m: Vec<f32>,
+    }
+
     #[derive(Deserialize)]
     struct Response {
         current_weather: Option<CurrentWeather>,
         daily: Option<Daily>,
+        hourly: Option<Hourly>,
     }
 
     let resp = reqwest::get(url).await?.json::<Response>().await?;
@@ -87,8 +101,14 @@ pub async fn run(
 
         for i in 0..7 {
             let date: Vec<&str> = daily_weather.time[i].split("-").collect();
+            let mut new_line = String::from("\n");
+
+            if i == 6 {
+                new_line = String::from("");
+            }
+
             println!(
-                "{:?} - {}\nHigh: {}°{temperature_unit}\nLow: {}°{temperature_unit}\n",
+                "{:?} - {}\nHigh: {}°{temperature_unit}\nLow: {}°{temperature_unit}{}",
                 chrono::NaiveDate::from_ymd_opt(
                     date[0].parse::<i32>().unwrap(),
                     date[1].parse::<u32>().unwrap(),
@@ -98,8 +118,32 @@ pub async fn run(
                 .weekday(),
                 convert_to_weather_condition(daily_weather.weathercode[i]),
                 daily_weather.temperature_2m_max[i] as i32,
-                daily_weather.temperature_2m_min[i] as i32
+                daily_weather.temperature_2m_min[i] as i32,
+                new_line
             )
+        }
+    }
+
+    if resp.hourly.is_some() {
+        let daily_weather = resp.hourly.unwrap();
+        let local_time = Local::now();
+
+        let mut num = 0;
+        for i in 0..48 {
+            let date = &daily_weather.time[i];
+            let from = NaiveDateTime::parse_from_str(date, "%Y-%m-%dT%H:%M").unwrap();
+            let date_time = Local.from_local_datetime(&from).unwrap();
+
+            // If the date is in the future
+            if local_time.cmp(&date_time) == Ordering::Less && num < 25 {
+                num += 1;
+                println!(
+                    "{} - {} {}°{temperature_unit}",
+                    date_time.format("%l%P"),
+                    convert_to_weather_condition(daily_weather.weathercode[i]),
+                    daily_weather.temperature_2m[i] as i32,
+                )
+            }
         }
     }
 
