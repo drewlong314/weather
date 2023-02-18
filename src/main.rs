@@ -1,5 +1,6 @@
 use std::env::args;
 
+use chrono::{Datelike, Duration, Local, TimeZone};
 use serde::Deserialize;
 #[tokio::main]
 
@@ -10,18 +11,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         weathercode: i32,
     }
 
+    #[derive(Deserialize, Debug)]
+    struct Daily {
+        time: Vec<String>,
+        weathercode: Vec<i32>,
+        temperature_2m_max: Vec<f32>,
+        temperature_2m_min: Vec<f32>,
+    }
+
     #[derive(Deserialize)]
     struct Response {
-        current_weather: CurrentWeather,
+        current_weather: Option<CurrentWeather>,
+        daily: Option<Daily>,
     }
 
     // TODO: Add option to set location and Temperature Unit in an env
     // TODO: Show full day's forecast
-    // TODO: Show full week's Highs and Low's
     // TODO: Create a lib.rs so that main.rs is more readable
 
     let mut temperature_unit = "C";
-    let mut url = String::from("https://api.open-meteo.com/v1/forecast?latitude=33.52&longitude=-86.80&current_weather=true");
+    let mut url =
+        String::from("https://api.open-meteo.com/v1/forecast?latitude=33.52&longitude=-86.80");
     let args = args();
     if args.len() > 0 {
         for arg in args {
@@ -30,22 +40,55 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     url = url + "&temperature_unit=fahrenheit";
                     temperature_unit = "F";
                 }
+                "current" => {
+                    url = url + "&current_weather=true&timezone=auto";
+                }
+                "week" => {
+                    let now = Local::now();
+                    let week = (now + Duration::days(7)).format("%Y-%m-%d");
+                    let formatted_now = now.format("%Y-%m-%d");
+                    url = url + &format!("&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=auto&start_date={formatted_now}&end_date={week}");
+                }
                 _ => (),
             }
         }
     }
 
+    println!("{url}");
     let resp = reqwest::get(url).await?.json::<Response>().await?;
 
-    let current_weather = resp.current_weather;
-    println!(
-        "Current Temperature: {:#?}°{}",
-        current_weather.temperature as i32, temperature_unit
-    );
-    println!(
-        "Current Weather Condition: {}",
-        convert_to_weather_condition(current_weather.weathercode)
-    );
+    if resp.current_weather.is_some() {
+        let current_weather = resp.current_weather.unwrap();
+        println!(
+            "Current Temperature: {:#?}°{}",
+            current_weather.temperature as i32, temperature_unit
+        );
+        println!(
+            "Current Weather Condition: {}",
+            convert_to_weather_condition(current_weather.weathercode)
+        );
+    }
+
+    if resp.daily.is_some() {
+        let daily_weather = resp.daily.unwrap();
+
+        for i in 0..7 {
+            let date: Vec<&str> = daily_weather.time[i].split("-").collect();
+            println!(
+                "{:?} - {}\nHigh: {}°{temperature_unit}\nLow: {}°{temperature_unit}\n",
+                chrono::NaiveDate::from_ymd_opt(
+                    date[0].parse::<i32>().unwrap(),
+                    date[1].parse::<u32>().unwrap(),
+                    date[2].parse::<u32>().unwrap()
+                )
+                .unwrap()
+                .weekday(),
+                convert_to_weather_condition(daily_weather.weathercode[i]),
+                daily_weather.temperature_2m_max[i] as i32,
+                daily_weather.temperature_2m_min[i] as i32
+            )
+        }
+    }
 
     Ok(())
 }
