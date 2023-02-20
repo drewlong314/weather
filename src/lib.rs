@@ -10,7 +10,7 @@ pub struct Config {
 }
 
 // Maybe put this in an impl
-pub fn config(args: Args) -> Result<Config, &'static str> {
+pub async fn config(args: Args) -> Result<Config, &'static str> {
     let mut temperature_unit = String::from("C");
     let mut url =
         String::from("https://api.open-meteo.com/v1/forecast?latitude=33.52&longitude=-86.80");
@@ -19,9 +19,23 @@ pub fn config(args: Args) -> Result<Config, &'static str> {
         url = String::new();
     }
 
-    if args.len() < 4 {
+    if args.len() < 5 {
         for (i, arg) in args.enumerate() {
             if i == 1 {
+                // let oc = Opencage::new("ac6788448df84c38a6afac4786c87b37".to_string());
+                // let address = "Schwabing, München";
+                // // let address = arg;
+                // let res: Vec<Point<f64>> = oc.forward(&address).unwrap();
+                // println!("{:?}", res);
+                // let first_result = &res[0];
+
+                // println!(
+                //     "{longitude}, {latitude}",
+                //     longitude = first_result.x(),
+                //     latitude = first_result.y()
+                // );
+                // 11.5761796, 48.1599218
+            } else if i == 2 {
                 match arg.as_str() {
                     "current" => {
                         url = url + "&current_weather=true&timezone=auto";
@@ -46,7 +60,7 @@ pub fn config(args: Args) -> Result<Config, &'static str> {
                     }
                     _ => url = String::new(),
                 }
-            } else if i == 2 {
+            } else if i == 3 {
                 match arg.as_str() {
                     "-F" => {
                         url = url + "&temperature_unit=fahrenheit";
