@@ -10,6 +10,5 @@ async fn main() {
         process::exit(1);
     });
 
-    println!("{}", config.url);
     weather::run(config).await.unwrap_or(());
 }

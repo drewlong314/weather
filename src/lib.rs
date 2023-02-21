@@ -1,9 +1,10 @@
 use std::{cmp::Ordering, env::Args};
 
 use chrono::{Datelike, Duration, Local, NaiveDateTime, TimeZone};
+use geocoding::{Forward, GeocodingError, Opencage, Point};
 use serde::Deserialize;
+use tokio::task::spawn_blocking;
 
-// TODO: Get Coordinates from location
 pub struct Config {
     pub url: String,
     pub temperature_unit: String,
@@ -12,8 +13,7 @@ pub struct Config {
 // Maybe put this in an impl
 pub async fn config(args: Args) -> Result<Config, &'static str> {
     let mut temperature_unit = String::from("C");
-    let mut url =
-        String::from("https://api.open-meteo.com/v1/forecast?latitude=33.52&longitude=-86.80");
+    let mut url = String::from("https://api.open-meteo.com/v1/forecast");
 
     if args.len() == 1 {
         url = String::new();
@@ -22,18 +22,31 @@ pub async fn config(args: Args) -> Result<Config, &'static str> {
     if args.len() < 5 {
         for (i, arg) in args.enumerate() {
             if i == 1 {
-                // let oc = Opencage::new("ac6788448df84c38a6afac4786c87b37".to_string());
-                // let address = "Schwabing, München";
-                // // let address = arg;
-                // let res: Vec<Point<f64>> = oc.forward(&address).unwrap();
-                // println!("{:?}", res);
-                // let first_result = &res[0];
+                let orange = spawn_blocking(move || {
+                    let oc = Opencage::new("ac6788448df84c38a6afac4786c87b37".to_string());
+                    let address = arg;
 
-                // println!(
-                //     "{longitude}, {latitude}",
-                //     longitude = first_result.x(),
-                //     latitude = first_result.y()
-                // );
+                    let res: Result<Vec<Point<f64>>, GeocodingError> = oc.forward(&address);
+                    match res {
+                        Ok(ref res) => res,
+                        Err(err) => return Err(err),
+                    };
+                    let first_result = res.unwrap()[0];
+
+                    Ok(format!(
+                        "?latitude={}&longitude={}",
+                        first_result.y(),
+                        first_result.x()
+                    ))
+                })
+                .await
+                .unwrap();
+
+                match orange {
+                    Ok(ref orange) => url = url + orange,
+                    Err(_) => return Err("Invalid location"),
+                };
+
                 // 11.5761796, 48.1599218
             } else if i == 2 {
                 match arg.as_str() {
@@ -161,7 +174,7 @@ Options:
     if resp.current_weather.is_some() {
         let current_weather = resp.current_weather.unwrap();
         println!(
-            "Current Temperature: {:#?}°{}",
+            "Current Temperature: {}°{}",
             current_weather.temperature as i32, temperature_unit
         );
         println!(
