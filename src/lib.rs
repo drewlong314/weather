@@ -15,14 +15,18 @@ pub async fn config(args: Args) -> Result<Config, &'static str> {
     let mut temperature_unit = String::from("C");
     let mut url = String::from("https://api.open-meteo.com/v1/forecast");
 
-    if args.len() == 1 {
+    if args.len() < 3 {
         url = String::new();
+        return Ok(Config {
+            url,
+            temperature_unit,
+        });
     }
 
     if args.len() < 5 {
         for (i, arg) in args.enumerate() {
             if i == 1 {
-                let orange = spawn_blocking(move || {
+                let api_response = spawn_blocking(move || {
                     let oc = Opencage::new("ac6788448df84c38a6afac4786c87b37".to_string());
                     let address = arg;
 
@@ -42,12 +46,10 @@ pub async fn config(args: Args) -> Result<Config, &'static str> {
                 .await
                 .unwrap();
 
-                match orange {
-                    Ok(ref orange) => url = url + orange,
+                match api_response {
+                    Ok(ref location) => url = url + location,
                     Err(_) => return Err("Invalid location"),
                 };
-
-                // 11.5761796, 48.1599218
             } else if i == 2 {
                 match arg.as_str() {
                     "current" => {
@@ -71,7 +73,7 @@ pub async fn config(args: Args) -> Result<Config, &'static str> {
                     "h" => {
                         url = String::new();
                     }
-                    _ => url = String::new(),
+                    _ => return Err("Incorrect second argument"),
                 }
             } else if i == 3 {
                 match arg.as_str() {
@@ -80,7 +82,7 @@ pub async fn config(args: Args) -> Result<Config, &'static str> {
                         temperature_unit = String::from("F");
                     }
                     "-C" => (),
-                    _ => return Err("Incorrect second argument"),
+                    _ => return Err("Incorrect third argument"),
                 }
             }
         }
@@ -138,7 +140,12 @@ pub async fn run(
         "Weather - A CLI Weather App
 
 Usage:
-    weather [COMMAND] [OPTION]
+    weather [LOCATION] [COMMAND] [OPTION]
+
+Location:
+    example one: paris-france
+
+    example two: chicago-illinois
 
 Commands:
     current
