@@ -1,4 +1,4 @@
-# Weather - A CLI weather app
+## Weather - A CLI weather app
 
 ### How to use
 
